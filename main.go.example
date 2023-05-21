@@ -1,0 +1,94 @@
+package main
+
+import (
+	"./parsing"
+	"fmt"
+	"strings"
+
+	antlr "github.com/antlr/antlr4/runtime/Go/antlr"
+)
+
+// Базовая структура дерева
+type MyTreeShapeListener struct {
+	*parsing.BaseJSONListener
+}
+
+// Вернуть базовую структуру дерева
+func NewMyTreeShapeListener() *MyTreeShapeListener {
+	return new(MyTreeShapeListener)
+}
+
+// Это переопределение базовой функции у сгенерированной структуры 'parser.BaseJSONListener'
+//   - тут будет выполнятся при каждом заходе как я понимаю
+//     так можно просмотреть все шаги обхода дерева.
+func (this *MyTreeShapeListener) EnterEveryRule(ctx antlr.ParserRuleContext) {
+	// ------------------------------------------------------------
+	fmt.Printf("Entered a rule, with Index: %d", ctx.GetRuleIndex())
+	//fmt.Println(ctx.GetRuleIndex())
+	fmt.Printf(" Text: %s\nStart line: %d\n", ctx.GetText(), ctx.GetStart().GetLine())
+	//fmt.Println("--------------")
+}
+
+func main() {
+
+	errorListener := &parsing.CustomErrorListener{} // My Custom ErrorOverride
+
+	var sb strings.Builder //new StringBuilder();
+	sb.WriteString("{")
+	sb.WriteString("\"description\":\"Animaginary server config file\",")
+	sb.WriteString("\"count\":500,")
+	sb.WriteString("\"logs\":{\"level\":\"verbose\",\"dir\":\"/var/log\"},")
+	sb.WriteString("\"host\"+\"antlr.org\",")
+	sb.WriteString("\"admin\":[\"parrt\",\"tombu\"],")
+	sb.WriteString("\"aliases\":[]")
+	sb.WriteString("}")
+
+	// Load from file:
+	//input, _ := antlr.NewFileStream(os.Args[1])
+	// Or load from StringBuilder:
+	input := antlr.NewInputStream(sb.String())
+
+	lexer := parsing.NewJSONLexer(input)
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errorListener)
+
+	/*
+		//
+		tokes := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+		parser := parsing.NewJSONParser(tokes)
+
+		// Add custom ParserError - from file parsing/error_listeners.go
+		parser.RemoveErrorListeners()
+		parser.AddErrorListener(&parsing.MyErrorListener{})
+
+
+
+		fmt.Println(parser.GetRuleNames())
+		// Output: [json obj pair arr value]
+	*/
+
+	tokens := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	p := parsing.NewJSONParser(tokens)
+
+	p.RemoveErrorListeners()
+	p.AddErrorListener(errorListener)
+
+	tree := p.Json()
+
+	//fmt.Println(tree)
+	antlr.ParseTreeWalkerDefault.Walk(NewMyTreeShapeListener(), tree)
+
+	/*
+		stream := antlr.NewCommonTokenStream(lexer, 0)
+		p := parsing.NewJSONParser(stream)
+
+		p.RemoveErrorListeners()
+		p.AddErrorListener(&parsing.MyErrorListener{})
+
+		p.BuildParseTrees = true
+
+		tree := p.Json()
+		antlr.ParseTreeWalkerDefault.Walk(NewMyTreeShapeListener(), tree)
+	*/
+
+}
